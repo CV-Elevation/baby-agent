@@ -172,6 +172,14 @@ description: Review code for bugs, style issues, and best practices
 - `ToolName()`: 返回 "load_skill"
 - `Execute()`: 调用 `skill.LoadSkill()` 获取完整内容
 
+> **💡 重要说明**：`load_skill` 工具本质上与 `read` 工具没有区别。它只是读取 `.babyagent/skills/<skill-id>/SKILL.md` 文件的内容并返回给 LLM。我们提供专门的 `load_skill` 工具而不是让 LLM 直接使用 `read` 工具的原因是：
+>
+> 1. **语义清晰**：`load_skill` 明确表达了意图，让 LLM 知道这是一个技能加载操作
+> 2. **路径标准化**：自动处理技能文件路径，避免 LLM 猜测文件位置
+> 3. **未来扩展性**：可以在工具内部添加技能验证、版本管理等逻辑
+>
+> 实际上，LLM 完全可以直接使用 `read` 工具读取技能文件，效果是一样的。`load_skill` 只是一个语义化的封装。
+
 ### Context (`ch09/context/engine.go`)
 
 **初始化时**：

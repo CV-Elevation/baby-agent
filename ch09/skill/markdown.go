@@ -7,8 +7,16 @@ import (
 	"path/filepath"
 	"strings"
 
+	"gopkg.in/yaml.v3"
+
 	"babyagent/shared"
 )
+
+// frontMatter represents the YAML front matter structure
+type frontMatter struct {
+	Name        string `yaml:"name"`
+	Description string `yaml:"description"`
+}
 
 // LoadSkill loads both metadata and content from a SKILLS.md file by id
 // Returns (metadata, content, error)
@@ -21,58 +29,39 @@ func LoadSkill(id string) (SkillMetadata, string, error) {
 	}
 
 	text := string(contentBytes)
-	text = strings.TrimLeft(text, "\n\r")
 
-	// Check for front matter delimiter
-	if !strings.HasPrefix(text, "---") {
-		return SkillMetadata{}, "", errors.New("skill file must start with front matter (---)")
+	// Split by front matter delimiter
+	parts := strings.SplitN(text, "---", 3)
+	if len(parts) < 3 {
+		return SkillMetadata{}, "", errors.New("skill file must have YAML front matter enclosed in `---`")
 	}
 
-	// Find the end of front matter
-	endIdx := strings.Index(text[3:], "\n---")
-	if endIdx == -1 {
-		return SkillMetadata{}, "", errors.New("front matter not closed (---)")
-	}
-	endIdx += 3 // Account for the opening "---"
+	// parts[0] is empty (before first ---)
+	// parts[1] is the YAML front matter
+	// parts[2] is the body content
 
-	frontMatter := text[3:endIdx]
-
-	meta := SkillMetadata{ID: id}
-
-	// Parse front matter
-	for _, line := range strings.Split(frontMatter, "\n") {
-		line = strings.TrimSpace(line)
-		if line == "" {
-			continue
-		}
-
-		parts := strings.SplitN(line, ":", 2)
-		if len(parts) != 2 {
-			continue
-		}
-
-		key := strings.TrimSpace(parts[0])
-		value := strings.TrimSpace(parts[1])
-
-		switch key {
-		case "name":
-			meta.Name = value
-		case "description":
-			meta.Description = value
-		}
+	// Parse front matter using yaml.Unmarshal
+	var fm frontMatter
+	if err := yaml.Unmarshal([]byte(parts[1]), &fm); err != nil {
+		return SkillMetadata{}, "", fmt.Errorf("failed to parse front matter: %w", err)
 	}
 
-	if meta.Name == "" {
+	if fm.Name == "" {
 		return SkillMetadata{}, "", errors.New("skill must have a 'name' field in front matter")
 	}
 
-	if meta.Description == "" {
+	if fm.Description == "" {
 		return SkillMetadata{}, "", errors.New("skill must have a 'description' field in front matter")
 	}
 
-	// Extract body content (after front matter)
-	endIdx += 4 // Skip closing "\n---"
-	bodyContent := strings.TrimSpace(text[endIdx:])
+	meta := SkillMetadata{
+		ID:          id,
+		Name:        fm.Name,
+		Description: fm.Description,
+	}
+
+	// Extract body content (trim leading newline)
+	bodyContent := strings.TrimSpace(parts[2])
 
 	return meta, bodyContent, nil
 }
